@@ -1,9 +1,9 @@
 const FIREBASE_CONFIG = {
-  apiKey: "你的APIKEY",
-  authDomain: "你的authDomain",
-  databaseURL: "你的databaseURL",
-  projectId: "你的projectId",
-  storageBucket: "你的storageBucket",
-  messagingSenderId: "你的messagingSenderId",
-  appId: "你的appId"
+  apiKey: "AIzaSyDMpMZcg9P9jjGrtzJxx_htVSfd02O0zlY",
+  authDomain: "gomoku-test-2f516.firebaseapp.com",
+  databaseURL: "https://gomoku-test-2f516-default-rtdb.firebaseio.com",
+  projectId: "gomoku-test-2f516",
+  storageBucket: "gomoku-test-2f516.firebasestorage.app",
+  messagingSenderId: "1032135458131",
+  appId: "1:1032135458131:web:7c7776080cff97c249f5a6"
 };
