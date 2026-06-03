@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>五子棋 Online（無聊天室版）</title>
+
+<style>
+
+body{
+    margin:0;
+    font-family:Arial;
+    background:#f5f5f5;
+    text-align:center;
+}
+
+h1{
+    margin-top:15px;
+}
+
+.top-panel{
+    margin:10px;
+}
+
+input{
+    padding:8px;
+    font-size:16px;
+}
+
+button{
+    padding:8px 15px;
+    font-size:16px;
+    cursor:pointer;
+    border:none;
+    border-radius:5px;
+    margin:5px;
+}
+
+#createBtn{
+    background:#333;
+    color:white;
+}
+
+#joinBtn{
+    background:#555;
+    color:white;
+}
+
+#restartBtn{
+    background:#b22222;
+    color:white;
+    color:white;
+}
+
+#status{
+    font-size:20px;
+    margin:10px;
+    font-weight:bold;
+}
+
+#roomInfo{
+    margin:10px;
+    font-size:18px;
+}
+
+.board{
+    display:grid;
+    grid-template-columns:repeat(15,32px);
+    gap:2px;
+    justify-content:center;
+    margin:auto;
+    background:#8b5a2b;
+    padding:10px;
+    border-radius:10px;
+    width:fit-content;
+}
+
+.cell{
+    width:32px;
+    height:32px;
+    background:#d9a066;
+    border:1px solid #654321;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    cursor:pointer;
+}
+
+.black,.white{
+    width:24px;
+    height:24px;
+    border-radius:50%;
+}
+
+.black{
+    background:black;
+}
+
+.white{
+    background:white;
+    border:1px solid black;
+}
+
+@media(max-width:700px){
+
+    .board{
+        grid-template-columns:repeat(15,20px);
+    }
+
+    .cell{
+        width:20px;
+        height:20px;
+    }
+
+    .black,.white{
+        width:14px;
+        height:14px;
+    }
+}
+
+</style>
+</head>
+
+<body>
+
+<h1>🎮 五子棋 Online（升級版）</h1>
+
+<div class="top-panel">
+
+<input type="text" id="playerName" placeholder="輸入玩家名稱">
+
+<button id="createBtn" onclick="createRoom()">建立房間</button>
+
+<input type="text" id="roomCode" placeholder="輸入房間號碼">
+
+<button id="joinBtn" onclick="joinRoom()">加入房間</button>
+
+<button id="restartBtn" onclick="restartGame()">重新開始</button>
+
+</div>
+
+<div id="roomInfo"></div>
+
+<div id="status">請建立或加入房間</div>
+
+<div class="board" id="board"></div>
+
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+
+<script>
+
+// ================= Firebase 設定 =================
+
+const firebaseConfig = {
+  apiKey: "AIzaSyDMpMZcg9P9jjGrtzJxx_htVSfd02O0zlY",
+  authDomain: "gomoku-test-2f516.firebaseapp.com",
+  databaseURL: "https://gomoku-test-2f516-default-rtdb.firebaseio.com",
+  projectId: "gomoku-test-2f516",
+  storageBucket: "gomoku-test-2f516.firebasestorage.app",
+  messagingSenderId: "1032135458131",
+  appId: "1:1032135458131:web:7c7776080cff97c249f5a6"
+};
+
+firebase.initializeApp(firebaseConfig);
+
+const db = firebase.database();
+
+const BOARD_SIZE = 15;
+
+let board = [];
+let roomId = "";
+let myPlayer = "";
+let currentPlayer = "B";
+let gameOver = false;
+
+const boardElement = document.getElementById("board");
+const statusElement = document.getElementById("status");
+
+// ================= 建立棋盤 =================
+
+function createBoard(){
+
+    boardElement.innerHTML = "";
+
+    for(let row=0; row<BOARD_SIZE; row++){
+
+        for(let col=0; col<BOARD_SIZE; col++){
+
+            const cell = document.createElement("div");
+
+            cell.classList.add("cell");
+
+            cell.dataset.row = row;
+            cell.dataset.col = col;
+
+            cell.addEventListener("click", handleMove);
+
+            boardElement.appendChild(cell);
+        }
+    }
+}
+
+// ================= 建立房間 =================
+
+function createRoom(){
+
+    roomId = Math.floor(1000 + Math.random()*9000).toString();
+
+    const playerName =
+        document.getElementById("playerName").value || "玩家1";
+
+    myPlayer = "B";
+
+    board = Array.from(
+        {length:BOARD_SIZE},
+        ()=>Array(BOARD_SIZE).fill(".")
+    );
+
+    db.ref("rooms/" + roomId).set({
+
+        board: board,
+        currentPlayer: "B",
+
+        players:{
+            B: playerName
+        }
+
+    });
+
+    document.getElementById("roomInfo").innerText =
+        "房間號碼：" + roomId;
+
+    listenRoom();
+    updateStatus();
+}
+
+// ================= 加入房間 =================
+
+async function joinRoom(){
+
+    roomId =
+        document.getElementById("roomCode").value;
+
+    const snapshot =
+        await db.ref("rooms/" + roomId).once("value");
+
+    if(!snapshot.exists()){
+        alert("房間不存在");
+        return;
+    }
+
+    const playerName =
+        document.getElementById("playerName").value || "玩家2";
+
+    myPlayer = "W";
+
+    db.ref("rooms/" + roomId + "/players/W")
+    .set(playerName);
+
+    document.getElementById("roomInfo").innerText =
+        "房間號碼：" + roomId;
+
+    listenRoom();
+    updateStatus();
+}
+
+// ================= 監聽房間 =================
+
+function listenRoom(){
+
+    db.ref("rooms/" + roomId).on("value", snapshot=>{
+
+        const data = snapshot.val();
+
+        if(!data) return;
+
+        board = data.board;
+        currentPlayer = data.currentPlayer;
+
+        renderBoard();
+        updateStatus();
+    });
+}
+
+// ================= 更新狀態 =================
+
+function updateStatus(){
+
+    if(gameOver) return;
+
+    if(currentPlayer === myPlayer){
+        statusElement.innerText = "輪到你下棋";
+    }else{
+        statusElement.innerText = "等待對手...";
+    }
+}
+
+// ================= 落子 =================
+
+async function handleMove(event){
+
+    if(gameOver) return;
+
+    if(currentPlayer !== myPlayer){
+        alert("還沒輪到你");
+        return;
+    }
+
+    const row = parseInt(event.target.dataset.row);
+    const col = parseInt(event.target.dataset.col);
+
+    if(board[row][col] !== ".") return;
+
+    board[row][col] = myPlayer;
+
+    if(checkWinner(row,col,myPlayer)){
+        gameOver = true;
+
+        alert(
+            myPlayer === "B"
+            ? "🎉 黑棋獲勝"
+            : "🎉 白棋獲勝"
+        );
+    }
+
+    await db.ref("rooms/" + roomId).update({
+
+        board: board,
+        currentPlayer:
+            currentPlayer === "B" ? "W" : "B"
+    });
+}
+
+// ================= 繪製棋盤 =================
+
+function renderBoard(){
+
+    const cells =
+        document.querySelectorAll(".cell");
+
+    cells.forEach(cell=>{
+
+        cell.innerHTML = "";
+
+        const row = cell.dataset.row;
+        const col = cell.dataset.col;
+
+        if(board[row][col] === "B"){
+
+            const piece = document.createElement("div");
+            piece.classList.add("black");
+            cell.appendChild(piece);
+
+        }else if(board[row][col] === "W"){
+
+            const piece = document.createElement("div");
+            piece.classList.add("white");
+            cell.appendChild(piece);
+        }
+    });
+}
+
+// ================= 勝利判定 =================
+
+function checkWinner(row,col,player){
+
+    const directions = [
+        [1,0],
+        [0,1],
+        [1,1],
+        [1,-1]
+    ];
+
+    for(const [dr,dc] of directions){
+
+        let count = 1;
+
+        let r = row + dr;
+        let c = col + dc;
+
+        while(
+            r>=0 &&
+            r<BOARD_SIZE &&
+            c>=0 &&
+            c<BOARD_SIZE &&
+            board[r][c]===player
+        ){
+            count++;
+            r += dr;
+            c += dc;
+        }
+
+        r = row - dr;
+        c = col - dc;
+
+        while(
+            r>=0 &&
+            r<BOARD_SIZE &&
+            c>=0 &&
+            c<BOARD_SIZE &&
+            board[r][c]===player
+        ){
+            count++;
+            r -= dr;
+            c -= dc;
+        }
+
+        if(count >= 5){
+            return true;
+        }
+    }
+
+    return false;
+}
+
+// ================= 重新開始 =================
+
+function restartGame(){
+
+    if(roomId === "") return;
+
+    board = Array.from(
+        {length:BOARD_SIZE},
+        ()=>Array(BOARD_SIZE).fill(".")
+    );
+
+    gameOver = false;
+
+    db.ref("rooms/" + roomId).update({
+
+        board: board,
+        currentPlayer: "B"
+    });
+}
+
+// 初始化
+createBoard();
+
+</script>
+
+</body>
+</html>
